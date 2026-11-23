@@ -1,12 +1,21 @@
 package closerange
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 // TODO: Generate должен в отдельной горутине отправить числа от 0 до limit-1,
 // затем закрыть канал. Неположительный limit даёт сразу закрытый канал.
 func Generate(limit int) <-chan int {
 	values := make(chan int)
-	close(values)
+	go func() {
+		defer close(values)
+		for i := 0; i < limit; i++ {
+			values <- i
+		}
+	}()
+
 	return values
 }
 
@@ -14,14 +23,28 @@ func Generate(limit int) <-chan int {
 // Если отправитель не закроет канал, цикл будет ждать следующее значение.
 // nil-канал трактуется как пустой вход; результат всегда ненулевой слайс.
 func Collect(values <-chan int) []int {
-	return []int{}
+	collection := make([]int, 0)
+	if values == nil {
+		return collection
+	}
+	for value := range values {
+		collection = append(collection, value)
+	}
+	return collection
 }
 
 // TODO: FilterEven должен отправить только чётные значения в исходном порядке
 // и закрыть выходной канал после завершения.
 func FilterEven(values []int) <-chan int {
 	result := make(chan int)
-	close(result)
+	go func() {
+		defer close(result)
+		for _, value := range values {
+			if value%2 == 0 {
+				result <- value
+			}
+		}
+	}()
 	return result
 }
 
@@ -29,7 +52,13 @@ func FilterEven(values []int) <-chan int {
 // в исходном порядке и закрыть выходной канал даже для пустого входа.
 func Double(values []int) <-chan int {
 	result := make(chan int)
-	close(result)
+	go func() {
+		defer close(result)
+
+		for _, value := range values {
+			result <- value * 2
+		}
+	}()
 	return result
 }
 
@@ -38,7 +67,31 @@ func Double(values []int) <-chan int {
 // Порядок внутри каждого входа сохраняется, общий порядок между входами не задан.
 func Merge(left, right <-chan int) <-chan int {
 	result := make(chan int)
-	close(result)
+	var wg sync.WaitGroup
+
+	if left != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for leftvalues := range left {
+				result <- leftvalues
+			}
+		}()
+	}
+	if right != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for rightvalues := range right {
+				result <- rightvalues
+			}
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(result)
+	}()
 	return result
 }
 
