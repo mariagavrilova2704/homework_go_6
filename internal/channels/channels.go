@@ -66,6 +66,7 @@ func RelayN(in <-chan int, out chan<- int, count int) int {
 	return num
 }
 
+// comment
 func Example() string {
 	pair := SendPair(10, 20)
 	first, second := <-pair, <-pair
