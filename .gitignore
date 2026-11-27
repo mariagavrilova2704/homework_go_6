@@ -28,5 +28,5 @@ go.work.sum
 .env
 
 # Редакторы и среды разработки
-# .idea/
+.idea/
 # .vscode/
